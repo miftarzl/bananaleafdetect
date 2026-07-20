@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="BananaLeafDetect - Deteksi penyakit daun pisang menggunakan teknologi AI YOLOv8 secara langsung di browser Anda. Cepat, privat, dan akurat.">
+    <title>BananaLeafDetect - Deteksi Penyakit Daun Pisang Berbasis AI</title>
+    <!-- Icons (FontAwesome) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme"> <!-- Default to dark theme for premium tech feel -->
+
+    <!-- PDF Printable Report Header (Hidden in UI, visible in Print/PDF) -->
+    <div class="print-header">
+        <div class="print-header-content">
+            <div>
+                <h1 style="font-family: 'Outfit', sans-serif; color: #198754; margin: 0;">BananaLeafDetect PRO</h1>
+                <p style="margin: 3px 0 0; font-size: 0.85rem; color: #555;">Sistem Laporan Diagnosis Kesehatan Daun Pisang Berbasis AI</p>
+            </div>
+            <div class="print-meta">
+                <p><strong>Tanggal:</strong> <span id="print-date">-</span></p>
+                <p><strong>ID Laporan:</strong> BLD-<span id="print-id">-</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header / Navbar -->
+    <header class="glass-panel">
+        <div class="logo-container">
+            <span class="logo-icon">🍃</span>
+            <div class="logo-text">
+                <h1>BananaLeafDetect</h1>
+                <span>AI Disease Scanner</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <!-- AI Load Status -->
+            <div class="status-pill" id="model-status-pill">
+                <div class="status-indicator loading" id="model-status-indicator"></div>
+                <span id="model-status-text">Memuat AI Model...</span>
+            </div>
+            <!-- Theme Toggle -->
+            <button class="theme-btn" id="theme-toggle-btn" title="Ganti Tema">
+                <i class="fa-solid fa-sun" id="theme-icon"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        <div class="dashboard-grid">
+            
+            <!-- Left Column: Input Source (Camera / Upload) -->
+            <section class="panel glass-panel">
+                <!-- Overlay for model loading progress -->
+                <div class="model-loading-overlay" id="model-loading-overlay">
+                    <div class="loading-spinner"></div>
+                    <h3 style="font-family: 'Outfit'; font-weight: 700;">Mengunduh Model AI (YOLOv8)</h3>
+                    <p style="font-size: 0.9rem; margin-top: 0.5rem; color: #a3b8ab; max-width: 300px;">
+                        Harap tunggu, model pendeteksi (12MB) sedang diunduh dan dipasang secara lokal di browser Anda.
+                    </p>
+                    <div class="loading-progress-bar">
+                        <div class="loading-progress-fill" id="loading-progress-fill"></div>
+                    </div>
+                    <span id="loading-percentage" style="font-size: 0.8rem; margin-top: 5px; font-weight: 600;">0%</span>
+                </div>
+
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i class="fa-solid fa-qrcode" style="color: var(--primary);"></i> Area Scanner
+                    </h2>
+                </div>
+
+
+
+
+                <!-- Input tabs -->
+                <div class="source-tabs">
+                    <button class="source-tab" id="tab-camera">
+                        <i class="fa-solid fa-camera"></i> Kamera Live
+                    </button>
+                    <button class="source-tab active" id="tab-upload">
+                        <i class="fa-solid fa-file-image"></i> Unggah Gambar
+                    </button>
+                </div>
+
+                <!-- Scan Area Container -->
+                <div class="scan-area" id="scan-container">
+                    <div class="scan-line" id="scan-laser"></div>
+                    
+                    <!-- Webcam Stream -->
+                    <video id="webcam-video" autoplay playsinline muted></video>
+                    
+                    <!-- File Image Preview -->
+                    <img id="image-preview" alt="Preview Daun Pisang">
+                    
+                    <!-- Canvas for drawing boxes -->
+                    <canvas id="canvas-overlay"></canvas>
+
+                    <!-- Camera Selector Button (For mobile back/front cam) -->
+                    <button class="camera-switch-btn" id="camera-switch-btn" title="Ganti Kamera" style="display: none;">
+                        <i class="fa-solid fa-camera-rotate"></i>
+                    </button>
+
+                    <!-- Upload Placeholder Trigger (Clickable) -->
+                    <div class="scan-placeholder" id="upload-trigger" style="display: none;">
+                        <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+                        <h4 style="font-family: 'Outfit'; font-weight: 600; font-size: 1.1rem;">Pilih atau Seret Gambar Daun</h4>
+                        <p style="font-size: 0.8rem; color: #a3b8ab;">Mendukung format JPG, PNG, WEBP (Maksimal 10MB)</p>
+                    </div>
+
+                    <!-- Hidden File Input -->
+                    <input type="file" id="file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Action Button Controls -->
+                <div class="action-controls">
+                    <!-- Scan Button -->
+                    <button class="btn btn-primary" id="btn-action">
+                        <i class="fa-solid fa-magnifying-glass"></i> Deteksi Daun
+                    </button>
+                    <!-- Reset Button -->
+                    <button class="btn btn-secondary" id="btn-reset" disabled>
+                        <i class="fa-solid fa-rotate-left"></i> Ulangi
+                    </button>
+                </div>
+
+
+            </section>
+
+            <!-- Right Column: Results Panel -->
+            <section class="panel glass-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">
+                        <i class="fa-solid fa-square-poll-horizontal" style="color: var(--primary);"></i> Laporan Diagnosis
+                    </h2>
+                    <!-- PDF Print trigger button -->
+                    <button class="btn btn-secondary" id="btn-print" style="padding: 0.5rem 1rem; font-size: 0.8rem;" disabled>
+                        <i class="fa-solid fa-file-pdf" style="color: #dc3545;"></i> Ekspor PDF
+                    </button>
+                </div>
+
+                <div class="results-panel">
+                    
+                    <!-- Result Placeholder (Before Scan) -->
+                    <div class="empty-results" id="results-empty">
+                        <div class="empty-results-icon">🔍</div>
+                        <h3 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 0.5rem;">Belum Ada Analisis</h3>
+                        <p style="font-size: 0.85rem; line-height: 1.5;">
+                            Silakan unggah gambar daun pisang atau arahkan kamera live ke daun pisang lalu klik tombol <strong>Deteksi Daun</strong> untuk memulai analisis AI.
+                        </p>
+                    </div>
+
+                    <!-- Scan Results (Visible after Scan) -->
+                    <div id="results-content" style="display: none; width: 100%;">
+                        
+                        <!-- Health Summary Banner -->
+                        <div class="health-score-container">
+                            <div class="health-summary-text">
+                                <h4 id="health-summary-title">Menghitung Kesehatan...</h4>
+                                <p id="health-summary-desc">Hasil analisis daun pisang berdasarkan probabilitas penyakit terdeteksi.</p>
+                            </div>
+                            <div class="health-score-radial">
+                                <svg class="radial-svg" viewBox="0 0 80 80">
+                                    <circle class="radial-bg" cx="40" cy="40" r="36" />
+                                    <circle class="radial-bar" id="health-progress-bar" cx="40" cy="40" r="36" />
+                                </svg>
+                                <span class="radial-text" id="health-score-percent">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Diagnosis List Title -->
+                        <h3 style="font-family: 'Outfit'; font-size: 1.1rem; margin: 1.5rem 0 0.75rem; color: var(--text-primary);">
+                            Penyakit & Objek Terdeteksi:
+                        </h3>
+
+                        <!-- Target Container for Detected Diseases -->
+                        <div class="diagnosis-list" id="diagnosis-list">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Disease Library / Encyclopedia Section -->
+        <section class="library-section">
+            <h2 style="font-family: 'Outfit'; font-weight: 800; font-size: 1.6rem; margin-bottom: 0.5rem; text-align: center;">
+                Perpustakaan Penyakit Daun Pisang
+            </h2>
+            <p style="text-align: center; color: var(--text-secondary); margin-bottom: 2rem; max-width: 600px; margin-left: auto; margin-right: auto; font-size: 0.9rem;">
+                Pelajari 7 jenis kondisi daun pisang yang dapat dideteksi oleh aplikasi ini beserta gejala khas dan cara penanganannya.
+            </p>
+
+            <!-- Search bar -->
+            <div class="library-search-bar">
+                <div class="search-input-wrapper">
+                    <input type="text" class="search-input" id="library-search" placeholder="Cari penyakit daun pisang (misal: Sigatoka, Panama, Moko)...">
+                </div>
+            </div>
+
+            <!-- Library grid -->
+            <div class="library-grid" id="library-grid">
+                <!-- Card 0 -->
+                <div class="library-card" data-name="sigatoka hitam black fungal">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">🍂</span>
+                        <div>
+                            <h3 class="library-card-title">Sigatoka Hitam</h3>
+                            <span class="library-card-subtitle">Black Sigatoka Disease</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Jamur <em>Mycosphaerella fijiensis</em>.</p>
+                        <p><strong>Gejala:</strong> Garis-garis coklat kemerahan hingga bercak hitam sejajar tulang daun. Daun yang terserang parah akan mengering dan membusuk dengan cepat, mengurangi fotosintesis secara drastis.</p>
+                    </div>
+                </div>
+
+                <!-- Card 1 -->
+                <div class="library-card" data-name="mosaik braktea virus bract mosaic">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">🔴</span>
+                        <div>
+                            <h3 class="library-card-title">Mosaik Braktea</h3>
+                            <span class="library-card-subtitle">Bract Mosaic Virus</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Banana Bract Mosaic Virus (BBrMV).</p>
+                        <p><strong>Gejala:</strong> Pola mosaik bergaris kuning atau merah kecoklatan pada tangkai daun, pelepah, dan braktea bunga pisang. Pertumbuhan tanaman menjadi kerdil dan daun berkerut.</p>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="library-card" data-name="sehat healthy leaf">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">🟢</span>
+                        <div>
+                            <h3 class="library-card-title">Daun Sehat</h3>
+                            <span class="library-card-subtitle">Healthy Leaf</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Kondisi:</strong> Optimal dan Bebas Penyakit.</p>
+                        <p><strong>Ciri:</strong> Permukaan daun berwarna hijau cerah merata, tidak ada bercak karat, robekan masif, layu kekuningan pada tepian, atau lubang hama yang mengganggu proses fotosintesis.</p>
+                    </div>
+                </div>
+
+                <!-- Card 3 -->
+                <div class="library-card" data-name="hama serangga insect pest">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">🐛</span>
+                        <div>
+                            <h3 class="library-card-title">Hama Serangga</h3>
+                            <span class="library-card-subtitle">Insect Pest Damage</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Ulat penggulung daun, kumbang, kutu pisang.</p>
+                        <p><strong>Gejala:</strong> Daun robek melingkar/menggulung seperti tabung (ulat penggulung), atau berlubang-lubang dan mengering di area bekas gigitan hama serangga.</p>
+                    </div>
+                </div>
+
+                <!-- Card 4 -->
+                <div class="library-card" data-name="moko layu bakteri bacterial moko">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">⚠️</span>
+                        <div>
+                            <h3 class="library-card-title">Penyakit Moko</h3>
+                            <span class="library-card-subtitle">Moko Bacterial Wilt</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Bakteri <em>Ralstonia solanacearum</em>.</p>
+                        <p><strong>Gejala:</strong> Layu kekuningan mendadak pada daun muda bagian dalam. Pelepah daun patah di sekitar batang, dan buah yang dihasilkan membusuk berwarna kehitaman di bagian dalam.</p>
+                    </div>
+                </div>
+
+                <!-- Card 5 -->
+                <div class="library-card" data-name="panama layu fusarium fungal panama wilt">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">💀</span>
+                        <div>
+                            <h3 class="library-card-title">Penyakit Panama</h3>
+                            <span class="library-card-subtitle">Panama / Fusarium Wilt</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Jamur tanah <em>Fusarium oxysporum</em>.</p>
+                        <p><strong>Gejala:</strong> Daun tua menguning secara sistemik mulai dari pinggir luar. Pelepah daun layu, patah terkulai mengelilingi batang semu, dan batang bagian bawah pecah membujur.</p>
+                    </div>
+                </div>
+
+                <!-- Card 6 -->
+                <div class="library-card" data-name="sigatoka kuning yellow fungal">
+                    <div class="library-card-header">
+                        <span class="library-card-icon">🟡</span>
+                        <div>
+                            <h3 class="library-card-title">Sigatoka Kuning</h3>
+                            <span class="library-card-subtitle">Yellow Sigatoka Disease</span>
+                        </div>
+                    </div>
+                    <div class="library-card-body">
+                        <p style="margin-bottom: 0.5rem;"><strong>Penyebab:</strong> Jamur <em>Mycosphaerella musicola</em>.</p>
+                        <p><strong>Gejala:</strong> Bercak kuning pucat lonjong kecil sejajar urat daun, yang lambat laun membesar menjadi bercak coklat tua dengan pusat bercak berwarna abu-abu terang kering.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+        <p>&copy; 2026 BananaLeafDetect. Dikembangkan untuk Tugas Akhir / Skripsi Universitas. Menggunakan YOLOv8 TFLite Client Inference.</p>
+    </footer>
+
+    <!-- Dynamic Modal: Simulation / Manual Analysis -->
+    <div class="modal-overlay" id="fallback-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Asisten Diagnosis Terpandu</h3>
+                <button class="modal-close" id="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.9rem; line-height: 1.5; color: var(--text-secondary);">
+                    Karena model AI dijalankan secara lokal di browser, terkadang keterbatasan RAM atau WebGL pada browser ponsel menghambat pendeteksian otomatis.
+                </p>
+                <p style="font-size: 0.9rem; font-weight: 700;">
+                    Tentukan penyakit berdasarkan pengamatan visual Anda pada gambar:
+                </p>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto; padding-right: 0.5rem;">
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="0" style="text-align: left; justify-content: flex-start;">
+                        🍂 Sigatoka Hitam (Bercak hitam memanjang)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="1" style="text-align: left; justify-content: flex-start;">
+                        🔴 Mosaik Braktea (Mosaik merah/kuning pelepah)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="2" style="text-align: left; justify-content: flex-start;">
+                        🟢 Daun Sehat (Hijau bersih segar)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="3" style="text-align: left; justify-content: flex-start;">
+                        🐛 Hama Serangga (Daun robek menggulung/bolong)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="4" style="text-align: left; justify-content: flex-start;">
+                        ⚠️ Penyakit Moko (Daun kuning dalam & layu pelepah)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="5" style="text-align: left; justify-content: flex-start;">
+                        💀 Penyakit Panama (Kuning tepi daun tua & pecah pelepah)
+                    </button>
+                    <button class="btn btn-secondary simulation-choice-btn" data-class="6" style="text-align: left; justify-content: flex-start;">
+                        🟡 Sigatoka Kuning (Bercak kuning lonjong abu-abu)
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-cancel-btn" style="padding: 0.5rem 1rem;">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- TensorFlow.js and TFJS-TFLite -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.10/dist/tf-tflite.min.js"></script>
+    <!-- Core JavaScript Logic -->
+    <script src="{{ url_for('static', filename='js/tflite-helper.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
